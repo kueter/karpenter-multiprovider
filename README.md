@@ -1,30 +1,30 @@
 # karpenter-multiprovider
 karpenter-multiprovider
 
-					**************    Installation    *************
+				**************    Installation    *************
 1. Install the aws cli
 	
 2. Export the local variable
 
-	```$ export KARPENTER_VERSION=v0.27.2```
-	```$ export CLUSTER_NAME="<your cluster name>"```
-	```$ export AWS_DEFAULT_REGION="<your region>"```
-	```$ export AWS_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"```
-	```$ export TEMPOUT=$(mktemp)```
-	
-	```$ export OIDC_ENDPOINT="$(aws eks describe-cluster --name ${CLUSTER_NAME} --query "cluster.identity.oidc.issuer" --output text)"```
+	```$ export KARPENTER_VERSION=v0.27.2
+	$ export CLUSTER_NAME="<your cluster name>"
+	$ export AWS_DEFAULT_REGION="<your region>"
+	$ export AWS_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+	$ export TEMPOUT=$(mktemp)
+	$ export OIDC_ENDPOINT="$(aws eks describe-cluster --name ${CLUSTER_NAME} --query "cluster.identity.oidc.issuer" --output text)"```
 	
 3. Create iam role
 
 Create the role `"KarpenterNodeRole-${CLUSTER_NAME}"` with this policies
 ```
-			AmazonEKSWorkerNodePolicy
-			AmazonEKS_CNI_Policy
-			AmazonEC2ContainerRegistryReadOnly
-			AmazonSSMManagedInstanceCore
+	AmazonEKSWorkerNodePolicy
+	AmazonEKS_CNI_Policy
+	AmazonEC2ContainerRegistryReadOnly
+	AmazonSSMManagedInstanceCore
 ```
+Type this commande
 ```
-echo '{
+$ echo '{
     "Version": "2012-10-17",
     "Statement": [
         {
@@ -60,10 +60,10 @@ aws iam create-instance-profile --instance-profile-name "KarpenterNodeInstancePr
 aws iam add-role-to-instance-profile --instance-profile-name "KarpenterNodeInstanceProfile-${CLUSTER_NAME}" --role-name "KarpenterNodeRole-${CLUSTER_NAME}"
 ```
 
-create an IAM role that the Karpenter controller will use to provision new instances
+Create an IAM role that the Karpenter controller will use to provision new instances
 
 ```
-cat << EOF > controller-trust-policy.json
+$ cat << EOF > controller-trust-policy.json
 {
     "Version": "2012-10-17",
     "Statement": [
@@ -85,12 +85,12 @@ cat << EOF > controller-trust-policy.json
 EOF
 
 ```
-aws iam create-role --role-name KarpenterControllerRole-${CLUSTER_NAME} \
-    --assume-role-policy-document file://controller-trust-policy.json
+```
+	$ aws iam create-role --role-name KarpenterControllerRole-${CLUSTER_NAME} --assume-role-policy-document file://controller-trust-policy.json
 ```
 
 ```
-cat << EOF > controller-policy.json
+$ cat << EOF > controller-policy.json
 {
     "Statement": [
         {
@@ -143,19 +143,23 @@ cat << EOF > controller-policy.json
     "Version": "2012-10-17"
 }
 EOF
+```
 
-aws iam put-role-policy --role-name KarpenterControllerRole-${CLUSTER_NAME} --policy-name KarpenterControllerPolicy-${CLUSTER_NAME} --policy-document file://controller-policy.json
 
+```
+	$ aws iam put-role-policy --role-name KarpenterControllerRole-${CLUSTER_NAME} --policy-name KarpenterControllerPolicy-${CLUSTER_NAME} --policy-document file://controller-policy.json
 ```
 
 5. Active the likerd-role
 	
-	```
+```
 	$ aws iam create-service-linked-role --aws-service-name spot.amazonaws.com || true
-	```
+```
 
 6. Logout of docker to perform an unauthenticated pull against the public ECR
-	```$ docker logout public.ecr.aws```
+```
+	$ docker logout public.ecr.aws
+```
 
 7. Add tags to subnets and security groups
 
@@ -163,41 +167,41 @@ aws iam put-role-policy --role-name KarpenterControllerRole-${CLUSTER_NAME} --po
 ```
 	for NODEGROUP in $(aws eks list-nodegroups --cluster-name ${CLUSTER_NAME} \
 	    --query 'nodegroups' --output text); do aws ec2 create-tags \
-		--tags "Key=karpenter.sh/discovery,Value=${CLUSTER_NAME}" \
-		--resources $(aws eks describe-nodegroup --cluster-name ${CLUSTER_NAME} \
-		--nodegroup-name $NODEGROUP --query 'nodegroup.subnets' --output text )
+	    --tags "Key=karpenter.sh/discovery,Value=${CLUSTER_NAME}" \
+	    --resources $(aws eks describe-nodegroup --cluster-name ${CLUSTER_NAME} \
+	    --nodegroup-name $NODEGROUP --query 'nodegroup.subnets' --output text )
 	done
 ```	
 - Security Groups
 
 ```
-		NODEGROUP=$(aws eks list-nodegroups --cluster-name ${CLUSTER_NAME} \
-		    --query 'nodegroups[0]' --output text)
+	NODEGROUP=$(aws eks list-nodegroups --cluster-name ${CLUSTER_NAME} \
+	    --query 'nodegroups[0]' --output text)
 
-		LAUNCH_TEMPLATE=$(aws eks describe-nodegroup --cluster-name ${CLUSTER_NAME} \
-		    --nodegroup-name ${NODEGROUP} --query 'nodegroup.launchTemplate.{id:id,version:version}' \
-		    --output text | tr -s "\t" ",")
+	LAUNCH_TEMPLATE=$(aws eks describe-nodegroup --cluster-name ${CLUSTER_NAME} \
+	    --nodegroup-name ${NODEGROUP} --query 'nodegroup.launchTemplate.{id:id,version:version}' \
+	    --output text | tr -s "\t" ",")
+```
+	# If your EKS setup is configured to use only Cluster security group, then please execute -
+```
+	SECURITY_GROUPS=$(aws eks describe-cluster \
+	    --name ${CLUSTER_NAME} --query "cluster.resourcesVpcConfig.clusterSecurityGroupId" --output text)
 
-		# If your EKS setup is configured to use only Cluster security group, then please execute -
+	# If your setup uses the security groups in the Launch template of a managed node group, then :
 
-		SECURITY_GROUPS=$(aws eks describe-cluster \
-		    --name ${CLUSTER_NAME} --query "cluster.resourcesVpcConfig.clusterSecurityGroupId" --output text)
+	SECURITY_GROUPS=$(aws ec2 describe-launch-template-versions \
+	    --launch-template-id ${LAUNCH_TEMPLATE%,*} --versions ${LAUNCH_TEMPLATE#*,} \
+	    --query 'LaunchTemplateVersions[0].LaunchTemplateData.[NetworkInterfaces[0].Groups||SecurityGroupIds]' \
+	    --output text)
+```
 
-				# If your setup uses the security groups in the Launch template of a managed node group, then :
-
-				SECURITY_GROUPS=$(aws ec2 describe-launch-template-versions \
-				    --launch-template-id ${LAUNCH_TEMPLATE%,*} --versions ${LAUNCH_TEMPLATE#*,} \
-				    --query 'LaunchTemplateVersions[0].LaunchTemplateData.[NetworkInterfaces[0].Groups||SecurityGroupIds]' \
-				    --output text)
-
-		aws ec2 create-tags \
-		    --tags "Key=karpenter.sh/discovery,Value=${CLUSTER_NAME}" \
-		    --resources ${SECURITY_GROUPS}
+```
+	$ aws ec2 create-tags --tags "Key=karpenter.sh/discovery,Value=${CLUSTER_NAME}" --resources ${SECURITY_GROUPS}
 ```	
 
 8. Update aws-auth ConfigMap of the cluster
 ```
-kubectl edit configmap aws-auth -n kube-system
+	$ kubectl edit configmap aws-auth -n kube-system
 ```
 
 Add this part
