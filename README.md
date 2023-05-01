@@ -6,12 +6,14 @@ karpenter-multiprovider
 	
 2. Export the local variable
 
-	```$ export KARPENTER_VERSION=v0.27.2
+```
+	$ export KARPENTER_VERSION=v0.27.2
 	$ export CLUSTER_NAME="<your cluster name>"
 	$ export AWS_DEFAULT_REGION="<your region>"
 	$ export AWS_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
 	$ export TEMPOUT=$(mktemp)
-	$ export OIDC_ENDPOINT="$(aws eks describe-cluster --name ${CLUSTER_NAME} --query "cluster.identity.oidc.issuer" --output text)"```
+	$ export OIDC_ENDPOINT="$(aws eks describe-cluster --name ${CLUSTER_NAME} --query "cluster.identity.oidc.issuer" --output text)"
+```
 	
 3. Create iam role
 
