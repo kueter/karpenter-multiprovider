@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inflate-app1
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: inflate-app1
+  template:
+    metadata:
+      labels:
+        app: inflate-app1
+    spec:
+      nodeSelector:
+        intent: app1
+        kubernetes.io/arch: amd64
+        karpenter.sh/provisioner-name: app1
+      containers:
+      - image: public.ecr.aws/eks-distro/kubernetes/pause:3.2
+        name: inflate-app1
+        resources:
+          requests:
+            cpu: "1"
+            memory: 256M
+      tolerations:
+      - key: app1
+        operator: Exists
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app: inflate-app1
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
